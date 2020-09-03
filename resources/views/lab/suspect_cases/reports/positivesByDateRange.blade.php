@@ -4,7 +4,7 @@
 
 @section('content')
 
-<h3 class="mb-3">Casos positivos por rango de fechas</h3>
+<h3 class="mb-3">Casos  por rango de fechas</h3>
 
 <form method="get" class="form-inline mb-3" action="{{ route('lab.suspect_cases.reports.positivesByDateRange') }}">
     <div class="form-group ml-3">

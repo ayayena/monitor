@@ -368,7 +368,7 @@
                                 @endcan
 
                                 @can('Report: positives by range')
-                                <a class="dropdown-item" href="{{ route('lab.suspect_cases.reports.positivesByDateRange') }}">Reporte de positivos por fecha</a>
+                                <a class="dropdown-item" href="{{ route('lab.suspect_cases.reports.positivesByDateRange') }}">Reporte de casos por fecha</a>
                                 @endcan
 
                                 @can('Report: requires licence')
