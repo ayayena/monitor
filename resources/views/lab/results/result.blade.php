@@ -110,6 +110,7 @@
                 <tr>
                     <th>PRUEBA</th>
                     <th>RESULTADO</th>
+                    <th>MOTIVO RECHAZO</th>
                     <th>R. REFERENCIA</th>
                     <th>MÉTODO</th>
                 </tr>
@@ -118,6 +119,7 @@
                 <tr>
                     <td>SARS-CoV-2</td>
                     <td>{{ $case->covid19 }}</td>
+                    <td>{{$case->reason}}</td>
                     <td>[ Negativo ]</td>
                     <td>PCR en tiempo real</td>
                 </tr>
