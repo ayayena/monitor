@@ -4,9 +4,9 @@
 
 @section('content')
 
-<h3 class="mb-3">Casos con resultado por rango de fechas</h3>
+<h3 class="mb-3">Casos pendientes por rango de fechas</h3>
 
-<form method="get" class="form-inline mb-3" action="{{ route('lab.suspect_cases.reports.positivesByDateRange') }}">
+<form method="get" class="form-inline mb-3" action="{{ route('lab.suspect_cases.reports.pendientesByDateRange') }}">
     <div class="form-group ml-3">
         <label for="for_from">Desde</label>
         <input type="date" class="form-control mx-sm-3" id="for_from" name="from"
@@ -36,16 +36,16 @@
     </div>
 
     <div class="form-group ml-3">
-        <a class="btn btn-outline-success" id="downloadLink" onclick="download_table_as_csv('tabla_positivos_por_fecha');">Descargar en excel</a>
+        <a class="btn btn-outline-success" id="downloadLink" onclick="download_table_as_csv('tabla_pendientes_por_fecha');">Descargar en excel</a>
     </div>
 </form>
 
 
 <div class="table-responsive">
-    <table class="table table-sm table-bordered table-responsive small" id="tabla_positivos_por_fecha">
+    <table class="table table-sm table-bordered table-responsive small" id="tabla_pendientes_por_fecha">
         <thead>
             <td>°</td>
-            <th nowrap>id</th>
+            <th nowrap>iddd</th>
             <th nowrap>Run</th>
             <th nowrap>Nombre</th>
             <th nowrap>Sexo</th>

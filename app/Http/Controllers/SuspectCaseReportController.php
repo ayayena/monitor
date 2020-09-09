@@ -1049,6 +1049,42 @@ class SuspectCaseReportController extends Controller
         return view('lab.suspect_cases.reports.positivesByDateRange', compact('suspectCases', 'from', 'to', 'communes', 'selectedCommune'));
     }
 
+    /**
+     * Obtiene casos pendientes  por
+     * rango de fecha
+     * @param Request $request
+     * @return Application|Factory|View
+     */
+    public function pendientesByDateRange(Request $request){
+
+        if($from = $request->has('from')){
+            $from = $request->get('from'). ' 00:00:00';
+            $to = $request->get('to'). ' 23:59:59';
+        }else{
+            $from = Carbon::yesterday();
+            $to = Carbon::now();
+        }
+
+        $communes_ids = array_map('trim',explode(",",env('COMUNAS')));
+        $communes = Commune::whereIn('id', $communes_ids)->get();
+
+        $selectedCommune = $request->get('commune');
+
+        $suspectCases = SuspectCase::whereBetween('sample_at', [$from, $to])
+            ->whereIn('pcr_sars_cov_2', ['pending'])
+            ->when($selectedCommune, function ($q) use ($selectedCommune){
+                return $q->whereHas('patient', function($q) use ($selectedCommune){
+                    $q->whereHas('demographic', function ($q) use ($selectedCommune){
+                        $q->where('commune_id', $selectedCommune);
+                    });
+                });
+            })
+            ->orderBy('pcr_sars_cov_2_at')
+            ->get();
+
+        return view('lab.suspect_cases.reports.pendientesByDateRange', compact('suspectCases', 'from', 'to', 'communes', 'selectedCommune'));
+    }
+
     /*****************************************************/
     /*            REPORTE HOSPITALIZADOS                 */
     /*****************************************************/

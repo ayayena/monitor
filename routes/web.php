@@ -226,6 +226,7 @@ Route::prefix('lab')->name('lab.')->group(function () {
             Route::match(['get','post'],'/minsal_ws','SuspectCaseReportController@report_minsal_ws')->name('minsal_ws');
             Route::get('/seremi/{laboratory}','SuspectCaseReportController@report_seremi')->name('seremi')->middleware('auth');
             Route::get('/positivesByDateRange','SuspectCaseReportController@positivesByDateRange')->name('positivesByDateRange')->middleware('auth');
+            Route::get('/pendientesByDateRange','SuspectCaseReportController@pendientesByDateRange')->name('pendientesByDateRange')->middleware('auth');
             Route::get('/positives_own','SuspectCaseReportController@positivesOwn')->name('positives_own')->middleware('auth');
             Route::get('hospitalized','SuspectCaseReportController@hospitalized')->name('hospitalized')->middleware('auth','can:Report: hospitalized');
             Route::get('hospitalizedByUserCommunes','SuspectCaseReportController@hospitalizedByUserCommunes')->name('hospitalizedByUserCommunes')->middleware('auth','can:Report: hospitalized commune');

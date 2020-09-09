@@ -6,7 +6,7 @@
 
 <h3 class="mb-3"><i class="fas fa-lungs-virus"></i>
     @if($laboratory)
-        Examenes del laboratorio {{ $laboratory->alias }}
+        Examenes del laboratoriopp {{ $laboratory->alias }}
     @else
         Listado de todos los exámenes
     @endif
