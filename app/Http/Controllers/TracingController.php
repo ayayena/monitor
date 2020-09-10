@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Tracing\Tracing;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Http\Request;
 use App\Patient;
 use Carbon\Carbon;
@@ -10,6 +12,7 @@ use App\EstablishmentUser;
 use App\Commune;
 use App\Establishment;
 use App\SuspectCase;
+use Illuminate\Support\Facades\Storage;
 
 
 class TracingController extends Controller
@@ -484,4 +487,606 @@ class TracingController extends Controller
 
         return view('patients.tracing.without_events', compact('tracingsWithoutEvents'));
     }
+
+    /**
+     * En desarrollo. Obtiene folio-indice del paciente.
+     * @throws GuzzleException
+     */
+    public function getFolioPatientWs(String $type_id, String $id)
+    {
+        $guzzle = new \GuzzleHttp\Client();
+
+        try {
+
+            $response = $guzzle->post(env('TOKEN_ENDPOINT'), [
+               'form_params' => [
+                   'grant_type' => 'client_credentials',
+                   'client_id' => env('CLIENT_ID'),
+                   'client_secret' => env('CLIENT_SECRET'),
+               ],
+            ]);
+
+            $accessToken = json_decode((string) $response->getBody(), true)['access_token'];
+
+            $client = new \GuzzleHttp\Client(['base_uri' => env('BASE_ENDPOINT')]);
+            $headers = [
+                'Authorization' => 'Bearer ' . $accessToken,
+                'x-api-key' => env('X_API_KEY'),
+            ];
+
+            $response2 = $client->request('GET', 'Patient/' . $type_id . '/' . $id, [
+                'headers' => $headers
+            ]);
+
+            /** test_parameters: type_id=1, $id=17353836-7 **/
+            dd(json_decode((string) $response2->getBody(), true));
+
+//            $response = ['status' => 1, 'msg' => 'OK'];
+        } catch (RequestException $e) {
+            $response = $e->getResponse();
+            $responseBodyAsString = $response->getBody()->getContents();
+            $decode = json_decode($responseBodyAsString);
+            dd($decode);
+//            $response = ['status' => 0, 'msg' => $decode->error];
+        }
+
+    }
+
+    /**
+     * En desarrollo. Envía paciente contacto estrecho
+     */
+    public function setPatientWs(Patient $patient){
+
+        $run = $patient->run . '-' . $patient->dv;
+        $family = $patient->fathers_family;
+        $given_name = $patient->name;
+        $mothers_family = $patient->mothers_family;
+        $mobile_phone = (int)$patient->demographic->telephone;
+        $home_phone = ($patient->demographic->telephone2) ? (int)$patient->demographic->telephone2 : null;
+        $email = ($patient->demographic->email) ? $patient->demographic->email : null;
+        $gender = $patient->gender;
+        //todo verificar si city esta estandarizado
+        $city = $patient->demographic->city;
+        //todo agregar columna de homologacion
+        $region = $patient->demographic->region->name;
+        $via = strtolower($patient->demographic->street_type);
+        $direccion = $patient->demographic->address;
+        $numero_residencia = $patient->demographic->number;
+        $region_id = (string)$patient->demographic->region_id;
+        $comuna_code_deis = $patient->demographic->commune->code_deis;
+
+        /** code deis de comunas deben ser de 5 digitos **/
+        if(strlen($comuna_code_deis) == 4){
+            $comuna_code_deis = '0' . $comuna_code_deis;
+        }
+
+        //todo obtener suspect case por parametro?, por ahora se obtiene el ultimo caso
+        $suspectCase = SuspectCase::where('patient_id', $patient->id)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $establecimiento_code_deis = ($suspectCase->establishment->new_code_deis) ?
+            (int)$suspectCase->establishment->new_code_deis : null;
+
+        /** TELECOM ARRAY **/
+        $mobile_phone_array = array(
+            'system' => 'phone',
+            'use' => 'mobile',
+            'value' => $mobile_phone
+        );
+
+        $home_phone_array = array(
+            'system' => 'phone',
+            'use' => 'home',
+            'value' => $home_phone
+        );
+
+        $email_array = array(
+            'system' => 'email',
+            'value' => $email,
+            'use' => 'home'
+        );
+
+        $telecomArray = array();
+        array_push($telecomArray, $mobile_phone_array);
+        if($home_phone){array_push($telecomArray, $home_phone_array);}
+        if($email){array_push($telecomArray, $email_array);}
+
+        /** ADDRESS ARRAY **/
+
+        $addressArray = array(
+            'state' => $region,
+            'country' => 'CL',
+            'extension' => array(
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/tipo-direccion',
+//                        todo cambiar a una de las opciones
+                    'valueString' => 'domicilio_particular'
+                ),
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/via',
+                    'valueString' => $via
+                ),
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/direccion',
+                    'valueString' => $direccion
+                ),
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/numero-residencia',
+                    'valueString' => $numero_residencia
+                ),
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/comuna',
+                    'valueCode' => $comuna_code_deis
+                ),
+                array(
+                    'url' => 'apidocs.epivigila.minsal.cl/region',
+                    'valueCode' => $region_id
+                ))
+        );
+
+        if($city){
+            $addressArray = array('city' => $city) + $addressArray;
+        }
+
+        /** JSON **/
+
+        $patient = array(
+            'resourceType' => 'Patient',
+            'identifier' => array(
+                array(
+                    'type' => array(
+                        'coding' => array(
+                            'system' => 'apidocs.epivigila.minsal.cl/tipo-documento',
+                            'code' => 1,
+                            'display' => 'run')
+                    ),
+                    'system' => 'www.registrocivil.cl/run',
+                    'value' => $run
+                )),
+            'name' => array(
+                'family' => $family,
+                'given' => array($given_name),
+                'extension' => array(
+                    array(
+                        'url' => 'www.hl7.org/fhir/extension-humanname-mothers-family.json.html',
+                        'valueString' => $mothers_family
+                    ))
+            ),
+            'telecom' => $telecomArray,
+            'gender' => $gender,
+            'birthDate' => '1992-10-27',
+            'address' => $addressArray,
+
+            'contact' => array(array(
+                'coding' => array(
+                    'system' => 'apidocs.epivigila.minsal.cl/folio-indice',
+                    'code' => '50669',
+                    'display' => 'folio-indice'
+                )
+            )),
+
+            'managingOrganization' => array(
+                'identifier' => array(array(
+                    'system' => 'apidocs.epivigila.minsal.cl/establecimientos-DEIS',
+                    'value' => $establecimiento_code_deis
+                )),
+                'name' => 'string'
+            )
+
+        );
+
+        /** template **/
+//        $patient = array(
+//            'resourceType' => 'Patient',
+//            'identifier' => array(
+//                array(
+//                    'type' => array(
+//                        'coding' => array(
+//                            'system' => 'apidocs.epivigila.minsal.cl/tipo-documento',
+//                            'code' => 1,
+//                            'display' => 'run')
+//                    ),
+//                    'system' => 'www.registrocivil.cl/run',
+//                    'value' => '18314540-1'
+//                )),
+//            'name' => array(
+//                'family' => 'Christiansen',
+//                'given' => array('Rodrigo Iván'),
+//                'extension' => array(
+//                    array(
+//                        'url' => 'www.hl7.org/fhir/extension-humanname-mothers-family.json.html',
+//                        'valueString' => 'Gonzalez'
+//                    ))
+//            ),
+//            'telecom' => array(
+//                array(
+//                    'system' => 'phone',
+//                    'use' => 'mobile',
+//                    'value' => 123456789
+//                ),
+//                array(
+//                    'system' => 'phone',
+//                    'use' => 'home',
+//                    'value' => 584679
+//                ),
+//                array(
+//                    'system' => 'email',
+//                    'value' => 'rodrigo.christiansen@hjnc.cl',
+//                    'use' => 'home'
+//                )),
+//            'gender' => 'male',
+//            'birthDate' => '1992-10-27',
+//            'address' => array(
+//                'city' => 'Arica',
+//                'state' => 'De Arica y Parinacota',
+//                'country' => 'CL',
+//                'extension' => array(
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/tipo-direccion',
+//                        'valueString' => 'domicilio_particular'
+//                ),
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/via',
+//                        'valueString' => 'calle'
+//                    ),
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/direccion',
+//                        'valueString' => 'garona'
+//                    ),
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/numero-residencia',
+//                        'valueString' => '598'
+//                    ),
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/comuna',
+//                        'valueCode' => '15101'
+//                    ),
+//                    array(
+//                        'url' => 'apidocs.epivigila.minsal.cl/region',
+//                        'valueCode' => '15'
+//                    ))
+//            ),
+//
+//            'contact' => array(array(
+//                'coding' => array(
+//                    'system' => 'apidocs.epivigila.minsal.cl/folio-indice',
+//                    'code' => '50669',
+//                    'display' => 'folio-indice'
+//                )
+//            )),
+//
+//            'managingOrganization' => array(
+//                'identifier' => array(array(
+//                    'system' => 'apidocs.epivigila.minsal.cl/establecimientos-DEIS',
+//                    'value' => 101100
+//                )),
+//                'name' => 'string'
+//            )
+//
+//        );
+
+        try {
+            $patientJson = json_encode($patient, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            Storage::disk('public')->put('prueba.json', $patientJson);
+            dd($patientJson);
+
+//            $response = ['status' => 1, 'msg' => 'OK'];
+        } catch (RequestException $e) {
+            $response = $e->getResponse();
+            $responseBodyAsString = $response->getBody()->getContents();
+            $decode = json_decode($responseBodyAsString);
+            dd('error: ' + $decode);
+
+//            $response = ['status' => 0, 'msg' => $decode->error];
+        }
+    }
+
+    public function setBundleContactWs(){
+
+        $bundle = array(
+            'resourceType' => "Bundle",
+            'id' => 'bundle-seguimiento',
+            'type' => 'collection',
+            'entry' => array(array(
+                'resource' => array(
+                    'resourceType' => 'Encounter',
+                    'id' => 'seguimiento-c19',
+                    'text' => array(
+                        'status' => 'generated',
+                        'div' => '<div>Seguimiento Contacto</div>'
+                    ),
+                    'contained' => array(array(
+                        'resourceType' => 'Location',
+                        'id' => 'seguimiento',
+                        'description' => 'Casa',
+                        'mode' => 'kind'
+                    )),
+                    'status' => 'finished',
+                    'class' => array(
+                        'system' => 'apidocs.epivigila.minsal.cl/tipo-domicilio',
+                        'code' => 'domicilio_particular',
+                        'display' => 'Seguimiento con paciente en domicilio particular'
+                    ),
+                    'subject' => array(
+                        'reference' => 'Patient/50669'
+                    ),
+                    'participant' => array(array(
+                        'individual' => array(
+                            'reference' => 'Practitioner/15000018-1',
+                            'display' => 'Alfredo Figueroa Seguel'
+                        )
+                    )),
+                    'period' => array(
+                        'start' => '2020-09-04',
+                        'end' => '2020-09-17'
+                    ),
+                    'location' => array(array(
+                        'location' => array(
+                            'reference' => 'seguimiento-c19',
+                            'display' => 'Lugar de seguimiento'
+                        ),
+                        'status' => 'completed',
+                        'period' => array(
+                            'start' => '2020-09-04',
+                            'end' => '2020-09-04'
+                        ),
+                        'extension' => array(
+                            array(
+                                'url' => 'apidocs.epivigila.minsal.cl/dia-seguimiento-covid',
+                                'valueInteger' => 1
+                            ),
+                            array(
+                                'url' => 'apidocs.epivigila.minsal.cl/tipo-contactabilidad',
+                                'valueString' => 'llamada'
+                            )
+                        )
+                    ))
+                ),
+                'request' => array(
+                    'method' => 'POST',
+                    'url' => 'Encounter'
+                )
+            ),
+                array(
+                    'resource' => array(
+                        'resourceType' => 'QuestionnaireResponse',
+                        'contained' => array(
+                            array(
+                                'resourceType' => 'Patient',
+                                'id' => 'seguimiento-covid',
+                                'identifier' => array(array(
+                                    'system' => 'apidocs.epivigila.minsal.cl/folio-contacto',
+                                    'code' => 'SC50669-1085',
+                                    'display' => 'folio-contacto'
+                                )),
+                                'contact' => array(
+                                    'relationship' => array(array(
+                                        'coding' => array(
+                                            'system' => 'apidocs.epivigila.minsal.cl/folio-indice',
+                                            'code' => '50669',
+                                            'display' => 'folio-indice'
+                                        )
+                                    ))
+                                ),
+                            ),
+                            array(
+                                'resourceType' => 'Practitioner',
+                                'id' => 'responsable-encuesta-seguimiento',
+                                'identifier' => array(
+                                    array(
+                                        'type' => array('text' => 'Rodrigo Baeza Galaz'),
+                                        'system' => 'www.registrocivil.cl/run',
+                                        'value' => '15840868-6'
+                                    )),
+                            ),
+                            array(
+                                'resourceType' => 'Organization',
+                                'id' => 'institucion-seguimiento',
+                                'identifier' => array(
+                                    array(
+                                        'system' => 'apidocs.epivigila.minsal.cl/establecimientos-DEIS',
+                                        'value' => 101100
+                                )),
+                                'name' => 'Hospital Dr. Juan Noé Crevani'
+                            )
+                        ),
+                        'status' => 'completed',
+                        'subject' => array(
+                            'reference' => 'seguimiento-c19'
+                        ),
+                        'encounter' => array(
+                            'reference' => 'Encounter/seguimiento-c19'
+                        ),
+                        'item' => array(
+                            array(
+                                'linkId' => '1',
+                                'text' => '¿Ha presentado alguno de los siguientes síntomas?',
+                                'item' => array(
+
+                                    array(
+                                        'linkId' => '1.1',
+                                        'text' => 'cefalea',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.2',
+                                        'text' => 'cianosis',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.3',
+                                        'text' => 'diarrea',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.4',
+                                        'text' => 'dolor_abdominal',
+                                        'answer' => array(
+                                            array('valueBoolean' => true)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.5',
+                                        'text' => 'dolor_toracico',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.6',
+                                        'text' => 'fiebre',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.7',
+                                        'text' => 'mialgia',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.8',
+                                        'text' => 'odinofagia',
+                                        'answer' => array(
+                                            array('valueBoolean' => true)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.9',
+                                        'text' => 'anosmia',
+                                        'answer' => array(
+                                            array('valueBoolean' => true)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.10',
+                                        'text' => 'ageusia',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.11',
+                                        'text' => 'postracion',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.12',
+                                        'text' => 'taquipnea',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '1.13',
+                                        'text' => 'tos',
+                                        'answer' => array(
+                                            array('valueBoolean' => false)
+                                        )
+                                    )
+                                )
+                            ),
+                            array(
+                                'linkId' => '2',
+                                'text' => 'respecto a examen covid-19',
+                                'item' => array(
+                                    array(
+                                        'linkId' => '2.1',
+                                        'text' => 'fue derivado para realizarse el examen?',
+                                        'answer' => array(
+                                            array(
+                                                'valueBoolean' => false,
+                                                'item' => array(
+                                                    array(
+                                                        'linkId' => '2.1.1',
+                                                        'text' => 'fecha derivacion toma de muestras',
+                                                        'answer' => array(
+                                                            array(
+                                                                'valueDate' => '2020-09-04'
+                                                            )
+                                                        )
+                                                    ),
+                                                    array(
+                                                        'linkId' => '2.1.2',
+                                                        'text' => 'derivacion a SU',
+                                                        'answer' => array(
+                                                            array(
+                                                                'valueBoolean' => false
+                                                            )
+                                                        )
+                                                    ),
+                                                    array(
+                                                        'linkId' => '2.1.3',
+                                                        'text' => '¿cumple cuarentena y aislamiento?',
+                                                        'answer' => array(
+                                                            array(
+                                                                'valueBoolean' => false
+                                                            )
+                                                        )
+                                                    ),
+                                                    array(
+                                                        'linkId' => '2.1.4',
+                                                        'text' => '¿tiene resultado covid?',
+                                                        'answer' => array(
+                                                            array(
+                                                                'valueString' => 'negativo'
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    array(
+                                        'linkId' => '2.2',
+                                        'text' => 'Observacion de Seguimiento',
+                                        'answer' => array(
+                                            array(
+                                                'valueString' => 'Sin observaciones'
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+
+                        )
+
+                    ),
+                    'request' => array(
+                        'method' => 'POST',
+                        'url' => 'QuestionnaireResponse'
+                    )
+                )
+
+            )
+        );
+
+
+        try {
+            $bundleJson = json_encode($bundle, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            Storage::disk('public')->put('prueba.json', $bundleJson);
+            dd($bundleJson);
+
+//            $response = ['status' => 1, 'msg' => 'OK'];
+        } catch (RequestException $e) {
+            $response = $e->getResponse();
+            $responseBodyAsString = $response->getBody()->getContents();
+            $decode = json_decode($responseBodyAsString);
+            dd('error: ' + $decode);
+
+//            $response = ['status' => 0, 'msg' => $decode->error];
+        }
+    }
+
 }

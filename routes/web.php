@@ -130,6 +130,13 @@ Route::prefix('patients')->name('patients.')->middleware('auth')->group(function
             Route::get('/{tracing_request}/request_complete', 'TracingRequestController@request_complete')->name('request_complete');
             Route::put('/{tracing_request}', 'TracingRequestController@request_complete_update')->name('request_complete_update');
         });
+
+        Route::prefix('ws')->name('ws.')->group(function (){
+            Route::get('/get_folio_patient/{type_id}/{id}', 'TracingController@getFolioPatientWs')->name('get_folio_patient');
+            Route::get('/set_patient/{patient}', 'TracingController@setPatientWs')->name('set_patient');
+            Route::get('/set_bundle_contact/{patient}', 'TracingController@setBundleContactWs')->name('set_bundle_contact');
+        });
+
     });
 });
 
@@ -202,6 +209,7 @@ Route::prefix('lab')->name('lab.')->group(function () {
 
 
         Route::get('/ownIndex/{laboratory?}','SuspectCaseController@ownIndex')->name('ownIndex')->middleware('auth','can:SuspectCase: own');
+        Route::get('/ownIndexFilter/{laboratory?}','SuspectCaseReportController@ownIndexFilter')->name('ownIndexFilter')->middleware('auth','can:SuspectCase: own');
         Route::get('/notification','SuspectCaseController@notificationInbox')->name('notificationInbox')->middleware('auth','can:Patient: tracing');
 
         Route::get('/exportSuspectCases/{lab}/{date?}','SuspectCaseController@exportExcel')->name('export')->middleware('auth');
@@ -380,6 +388,7 @@ Route::prefix('sanitary_residences')->name('sanitary_residences.')->middleware('
         Route::get('/excel/{booking}','BookingController@excel')->name('excel');
         Route::delete('/{booking}', 'BookingController@destroy')->name('destroy');
         Route::get('/residence/{residence}', 'BookingController@index')->name('index');
+        Route::get('/createfrompatient/{patient}', 'BookingController@createfrompatient')->name('createfrompatient');
         Route::get('/create', 'BookingController@create')->name('create');
         Route::get('/{booking}', 'BookingController@show')->name('show');
         Route::post('/', 'BookingController@store')->name('store');
