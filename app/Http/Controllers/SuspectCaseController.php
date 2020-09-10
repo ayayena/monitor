@@ -1392,11 +1392,12 @@ class SuspectCaseController extends Controller
             $id_esmeralda = NULL;
             $resultado = NULL;
             $fecha_resultado = NULL;
+            $motivo_rechazo=NULL;
 
             $id_esmeralda = $data['id esmeralda'];
             $resultado = $data['resultado'];
             $fecha_resultado = Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($data['fecha resultado']))->format('Y-m-d H:i:s');
-
+            $motivo_rechazo=$data["motivo rechazo"];
             if($resultado == "negativo" || $resultado == "NEGATIVO" || $resultado == "Negativo"){$resultado = "negative";}
             if($resultado == "pendiente" || $resultado == "PENDIENTE" || $resultado == "Pendiente"){$resultado = "pending";}
             if($resultado == "positivo" || $resultado == "POSITIVO" || $resultado == "Positivo"){$resultado = "positive";}
@@ -1408,6 +1409,7 @@ class SuspectCaseController extends Controller
                 if ($suspectCase) {
                     $suspectCase->pcr_sars_cov_2 = $resultado;
                     $suspectCase->pcr_sars_cov_2_at = $fecha_resultado;
+                    $suspectCase->reason = $motivo_rechazo;
                     $suspectCase->validator_id = Auth::id();
                     $suspectCase->save();
                     $cont += 1;
