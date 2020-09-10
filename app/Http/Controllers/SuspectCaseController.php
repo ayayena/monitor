@@ -1246,7 +1246,19 @@ class SuspectCaseController extends Controller
                       $new_demographic->suburb        = $patient['Poblacion o Suburbio'];
                       $new_demographic->commune_id    = $patient['Comuna'];
                       $new_demographic->region_id     = $patient['Region'];
-                      $new_demographic->nationality   = $patient['Nacionalidad'];
+                      if($patient['Nacionalidad']=="Chilena" || $patient['Nacionalidad']=="chilena")
+                      {
+                          $nacionalidad="Chile";
+                      }
+                      if($patient['Nacionalidad']=="Haitiana" || $patient['Nacionalidad']=="haitiana")
+                      {
+                          $nacionalidad="Haití";
+                      }
+                      if($patient['Nacionalidad']=="Venezolana" || $patient['Nacionalidad']=="venezolana")
+                      {
+                          $nacionalidad="Venezuela";
+                      }
+                      $new_demographic->nationality   = $nacionalidad;
                       $new_demographic->telephone     = $patient['Telefono'];
                       $new_demographic->email         = $patient['Email'];
                       $new_demographic->patient_id    = $patient_create->id;
