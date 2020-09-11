@@ -233,9 +233,7 @@
                     <!--
                     <input type="text" class="form-control" name="reason" placeholder="Motivo rechazo"
                            id="for_reason"  maxlength="10" value="{{ $suspectCase->reason }}">-->
-                           <textarea id="for_reason" class="form-control" name="reason"  rows="2" maxlength="150" cols="50">
-                              {{ $suspectCase->reason }}
-                          </textarea>
+                           <textarea id="for_reason" class="form-control" name="reason"  rows="2" maxlength="150" cols="50">{{ $suspectCase->reason }}</textarea>
                 </fieldset>
 
                 <!--END MOTIVO (DESCRIP)-->
